@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<title>node in production - tempalias.com</title>
+<!-- metadata -->
+<meta name="generator" content="S5" />
+<meta name="version" content="S5 1.2a2" />
+<meta name="author" content="Philip Hofstetter" />
+
+    <!-- configuration parameters -->
+<meta name="defaultView" content="slideshow" />
+<meta name="controlVis" content="hidden" />
+<!-- style sheet links -->
+<link rel="stylesheet" href="ui/default/slides.css" type="text/css" media="projection" id="slideProj" />
+<link rel="stylesheet" href="ui/default/outline.css" type="text/css" media="screen" id="outlineStyle" />
+<link rel="stylesheet" href="ui/default/print.css" type="text/css" media="print" id="slidePrint" />
+<link rel="stylesheet" href="ui/default/opera.css" type="text/css" media="projection" id="operaFix" />
+<link rel="stylesheet" href="ui/default/ta-presentation.css" type="text/css" />
+<link rel="stylesheet" href="ui/twilight.css" type="text/css" />
+
+<!-- S5 JS -->
+<script src="ui/default/slides.js" type="text/javascript"></script>
+</head>
+<body>
+
+<div class="layout">
+<div id="controls"><!-- DO NOT EDIT --></div>
+<div id="currentSlide"><!-- DO NOT EDIT --></div>
+<div id="header"></div>
+<div id="footer">
+<h1>tempalias - using node.js in production</h1>
+<h2>jsconf.eu &#8226; 2010-09-25</h2>
+</div>
+</div>
+
+<div class="presentation">
+
+<div class="slide">
+<h1>Using node.js in production: tempalias.com</h1>
+<h3>Philip Hofstetter</h3>
+<h4><a href="http://www.gnegg.ch/" rel="external">gnegg.ch</a></h4>
+<div class="handout"></div>
+</div>
+
+
+<div class="slide">
+<h1>About me</h1>
+<ul>
+<li>co-founder of <a href="http://www.sensational.ch">Sensational AG in Switzerland</a></li>
+<li>usually working on boring enterprisey stuff</li>
+<li>huge fan of JavaScript and Email routing<ul><li class="sidenote">(and character sets, but that's for another talk)</li></ul></li>
+<li>follower whore, so go ahead and follow: <a href="http://twitter.com/pilif">@pilif</a></li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>tempalias.com</h1>
+<ul>
+  <li>let's live our enthusiasm for JS and build something useful. Make it be email related.</li>
+  <li>fulfill a dream from 2002<br /><img src="img/adaddr.png" style="height: 200px"/></li>
+  <li>create temporary email aliases that expire after some amount of received mail or time</li>
+  <li>renewed enthusiasm for idea after listening to <a href="http://www.grc.com/sn/sn-242.htm">security now #242</a></li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>Demo time</h1>
+</div>
+
+<div class="slide">
+<h1>requirements</h1>
+<ul>
+  <li>service must be useful for anybody</li>
+  <li>must be free software (MIT license)</li>
+  <li>it should look nice</li>
+  <li>should be accessible to developers (as self-contained as possible)</li>
+  <li>must be built upon new stuff as learning is fun</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>making it look nice</h1>
+<p>easy if you have a friend who understands design.</p>
+<p class="imgcon" id="anim">
+<img src="img/ui-mockup.jpg" class="incremental" />
+<img src="img/v1.jpg" alt="" class="incremental" />
+<img src="img/v2.jpg" alt="" class="incremental" />
+<img src="img/v3.jpg" alt="" class="incremental" />
+</p>
+<p>huge thanks to <a href="http://www.richardhaydon.com">Richard Haydon</a></p>
+</div>
+
+
+<div class="slide">
+<h1>how email works</h1>
+<p>Basically just like your everyday letter</p>
+<ul style="margin-bottom: 2em">
+  <li>Message itself has header and body</li>
+  <li>Message is put into an envelope</li>
+  <li>MTAs never<sup>*</sup> touch the message, but always work with the envelope</li>
+  <li>MUAs (your mail client) don't (can't) look at the envelope but always look at the message</li>
+</ul>
+<p class="sidenote"><sup>*</sup> let's ignore the <em>Received</em> header or <em>8bitmime</em> this time around.</p>
+</div>
+
+<div class="slide">
+<h1>how tempalias works</h1>
+<img src="img/ta-resolution.svg" style="width: 100%; margin: 0;"/>
+</div>
+
+<div class="slide">
+<h1>keeping it accessible</h1>
+<p>Despite the complexity, everybody should be able to toy with this</p>
+<ul>
+  <li>no mail server plugin (portability, cost of forking just for denial)</li>
+  <li>no complicated external dependencies</li>
+  <li>clone and run!</li>
+</ul>
+<p>There's only one option: Build an SMTP proxy (and the web service of course)</p>
+</div>
+
+<div class="slide">
+<h1>smtp proxy</h1>
+<ul>
+  <li>Uses smarthost for final delivery (sparing me to do queue, NDR, etc)</li>
+  <li>First connected on client HELO</li>
+  <li>That design is stupid because tempalias is about rejecting mail</li>
+  <li>Now connecting only after successful alias resolution</li>
+  <li>All errors (connection or otherwise) yield 500 to incoming client.</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>persistence</h1>
+<ul>
+  <li>SQL is overkill. Key/Value is enough</li>
+  <li>Ironically, when I did this, SQLite was the only non-home-grown embedded solution</li>
+  <li>Wanted to learn key/value stores, so went with redis</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>alias generation</h1>
+<ul>
+  <li>UUIDs would be cool. But too long. Even base32 encoded (~20 chars)</li>
+  <li>Generating random strings now.</li>
+  <li>On collision, expand all future aliases by one characer in lengths (32x the keyspace)</li>
+  <li>SETNX reservations:alias-id to make sure it's free</li>
+  <li>We started at 4 chars, now at 6</li>
+  <li>Never reuse an alias</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>alias removal</h1>
+<ul>
+  <li><code>AliasProvider.findById()</code> doesn't find expired aliases</li>
+  <li>cron job purges expired aliases every 30 minutes in accordance to privacy policy</li>
+  <li>Not keeping a list of active aliases, so cleanup does get alias:* which is slow</li>
+  <li>reservations are never deleted</li>
+</ul>
+</div>
+
+
+<div class="slide">
+<h1>give me code!</h1>
+<p>You are right - this is looking like a sales pitch - we are coders. Dammit.</p>
+<ul>
+    <li>Fork it from GitHub: <a href="http://github.com/pilif/tempalias">http://github.com/pilif/tempalias</a></li>
+    <li>(mind the submodules)</li>
+    <li>configure it.<ul>
+        <li><code>config.ini.template</code></li>
+        <li>smarthost required</li>
+        <li>MX required</li>
+    </ul></li>
+    <li>run it<ul><li><code>node tempalias.js</code></li></ul></li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>dependencies</h1>
+<p>tempalias uses some external libraries (using git submodules)</p>
+<ul>
+  <li>node-paperboy (fixed some bugs, accepted upstream)</li>
+  <li>redis-node-client (great discussion with author. Patches rejected, fixed in a better way)</li>
+  <li>node-smtp (made server work. Made client work with chunks. No upstream interest in fixes
+      due to pending rewerite)</li>
+</ul>
+<p>It's a good idea to clone your dependencies and use your clone as the submodule source. <em>You will make
+modifications to your clones!</em></p>
+</div>
+
+<div class="slide">
+<h1>web service</h1>
+<ul>
+  <li>Frontend is static HTML plus client-side JS. <em>No single byte is dynamically generated</em></li>
+  <li>The frontend uses the API (which anybody else can use too)</li>
+  <li>No need to "bolt on" an API. Either it provides the needed feature or the service doesn't work</li>
+  <li>All frontend-code done using Sammy and templates.</li>
+  <li>Be RESTful or die</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>web service</h1>
+<p>While it's really cool, sometimes generated HTML can still be useful</p>
+<ul>
+  <li>Making the site crawlable is extra work (why the !? Google? Why?) <img src="img/url-with-bang.png" /></li>
+  <li>Sometimes knowing the hostname inside the JS/HTML can be helpful</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>awesome node</h1>
+<ul>
+  <li>On this machine here (17" MBP): 1500 alias generations/s. 3000 lookups</li>
+  <li>In my day job I'm happy with 50 r/s and was blown away 800 r/s in a Hello World test in mod_wsgi</li>
+  <li>Could easily handle reddit and HN</li>
+</ul>
+</div>
+
+
+<div class="slide">
+<h1>bookmarklet</h1>
+<ul>
+  <li>no chance doing this without jQuery</li>
+  <li>Our bookmarklet runs in the context of the parent page.
+     <ul>
+         <li>No pollution of global namespace</li>
+         <li>We still need jQuery</li>
+         <li>jQuery could already be available. No need to load it twice</li>
+     </ul>
+  </li>
+  <li>Cross domain restrictions force us to do JSONp (which isn't RESTful)</li>
+</ul>
+</div>
+
+
+<div class="slide">
+<h1>bookmarklet</h1>
+<p>Check if we were already loaded, otherwise, inject a script tag.</p>
+<p>Note how I have to pass the hostname as part of the bookmarklet as the injected
+script is static JS and doesn't know the hostname (and I don't want to hardcode it)</p>
+
+<pre class="twilight" style="font-size: 18px !important; padding: 10px;">(<span class="Storage">function</span>(){
+  <span class="Storage">var</span> c <span class="Keyword">=</span> {h: <span class="String"><span class="String">'</span>localhost:8080<span class="String">'</span></span>, d:<span class="Constant">1</span>, t:<span class="String"><span class="String">'</span>pilif@gnegg.ch<span class="String">'</span></span>, u:<span class="Constant">2</span>};
+  <span class="Keyword">if</span> (<span class="Support">window</span>.<span class="Keyword">$</span>__tempalias_com){
+    <span class="Support">window</span>.<span class="Keyword">$</span>__tempalias_com(c);
+  }<span class="Keyword">else</span>{
+    <span class="Storage">var</span> s<span class="Keyword">=</span><span class="Support">document</span>.<span class="SupportFunction">createElement</span>(<span class="String"><span class="String">'</span>script<span class="String">'</span></span>);
+    s.<span class="SupportConstant">src</span><span class="Keyword">=</span><span class="String"><span class="String">'</span>http://localhost:8080/bookmarklet.js<span class="String">'</span></span>;
+    <span class="Support">s</span>.<span class="Entity">onload</span> = <span class="Storage">function</span>(){
+      <span class="Support">window</span>.<span class="Keyword">$</span>__tempalias_com(c);
+    };
+    <span class="Support">document</span>.<span class="SupportFunction">getElementsByTagName</span>(<span class="String"><span class="String">'</span>head<span class="String">'</span></span>)[<span class="Constant">0</span>].<span class="SupportFunction">appendChild</span>(s);
+  }
+})();
+</pre>
+
+</div>
+
+<div class="slide">
+<h1>bookmarklet</h1>
+<p>Use jQuery if the one we want is already there. Otherwise, <em>carefully</em> load our own</p>
+<pre class="twilight" style="font-size: 15px !important; padding: 10px;">(<span class="Storage">function</span>(){
+   <span class="Storage">var</span> ta_jquery <span class="Keyword">=</span> undefined;
+
+   <span class="Storage">var</span> <span class="Entity">bm</span> = <span class="Storage">function</span>(<span class="Variable">adata</span>){
+     <span class="Storage">var</span> <span class="Entity">tempalias</span> = <span class="Storage">function</span>(<span class="Variable">$</span>){ <span class="Comment"><span class="Comment">/*</span> lots of code <span class="Comment">*/</span></span> }
+      <span class="Keyword">if</span> (ta_jquery){
+       tempalias(ta_jquery);
+     }
+     <span class="Keyword">if</span> (<span class="Support">window</span>.jQuery <span class="Keyword">&amp;</span><span class="Keyword">&amp;</span> (<span class="Support">window</span>.jQuery().jquery <span class="Keyword">==</span> <span class="String"><span class="String">'</span>1.4.2<span class="String">'</span></span>)){
+       ta_jquery <span class="Keyword">=</span> <span class="Support">window</span>.jQuery;
+       tempalias(ta_jquery);
+     }<span class="Keyword">else</span>{
+       (<span class="Storage">function</span>(){
+         <span class="Storage">var</span> old_jQuery <span class="Keyword">=</span> <span class="Support">window</span>.jQuery;
+         <span class="Storage">var</span> conflictProtect <span class="Keyword">=</span> (<span class="Keyword">typeof</span> <span class="Support">window</span>.<span class="Keyword">$</span><span class="Keyword">==</span><span class="String"><span class="String">'</span>function<span class="String">'</span></span>);
+         <span class="Storage">var</span> s <span class="Keyword">=</span> <span class="Support">document</span>.<span class="SupportFunction">createElement</span>(<span class="String"><span class="String">'</span>script<span class="String">'</span></span>);
+         s.<span class="SupportFunction">setAttribute</span>(<span class="String"><span class="String">'</span>src<span class="String">'</span></span>,<span class="String"><span class="String">'</span>http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js<span class="String">'</span></span>);
+         <span class="Support">s</span>.<span class="Entity">onload</span> = <span class="Storage">function</span>(){
+           ta_jquery <span class="Keyword">=</span> <span class="Support">window</span>.jQuery;
+           <span class="Keyword">if</span> (conflictProtect)
+             ta_jquery.noConflict();
+           <span class="Support">window</span>.jQuery <span class="Keyword">=</span> old_jQuery;
+           tempalias(ta_jquery);
+         };
+         <span class="Support">document</span>.<span class="SupportFunction">getElementsByTagName</span>(<span class="String"><span class="String">'</span>head<span class="String">'</span></span>)[<span class="Constant">0</span>].<span class="SupportFunction">appendChild</span>(s);
+       }());
+     }
+   };
+   <span class="Support">window</span>.<span class="Keyword">$</span>__tempalias_com <span class="Keyword">=</span> bm;
+ }());
+</pre>
+
+<p class="sidenote"><a href="http://twitter.com/brainlock">@brainlock</a> who sits in the audience could tell you a story of what can happen if you inject
+into the global namespace</p>
+</div>
+
+<div class="slide">
+<h1>and then, this happened</h1>
+<div style="text-align: center"><img src="img/kim.png" /></div>
+</div>
+
+<div class="slide">
+<h1>SPAM prevention</h1>
+<ul>
+  <li>doing RBL checks (downstream can't do them)</li>
+  <li>rate limit</li>
+  <li>don't trust tempalias upstream on smarthost (sa_exim, sender verification)</li>
+</ul>
+</div>
+
+<div class="slide">
+<h1>production use</h1>
+<ul>
+  <li>web service behind nginx (for compression - static files served by paperboy for out-of-the-boxyness)</li>
+  <li>SMTP on port 2525 (I'm not running my very first node app as root)</li>
+  <li>Using iptables and mark extension to make it appear to run at port 25</li>
+</ul>
+</div>
+
+
+<div class="slide">
+<h1>we still went down</h1>
+<ul>
+  <li>File handle starvation is a real issue</li>
+  <li>not closing files in paperboy, smtp-client, smtp-server</li>
+  <li>Exception handling with nested anonymous functions is impossible</li>
+  <li>Handle all errors right as they occur to minimise resource starcvation</li>
+  <li><em>unfortunately, we still leak sockets</em></li>
+</ul>
+
+<pre>
+
+$ lsof -p 14749 | grep WAIT | wc -l
+169
+</pre>
+
+after a week - so it's much better.
+</div>
+
+<div class="slide">
+<h1>Outlook</h1>
+<ul>
+  <li>getting contributors (*cough*)</li>
+  <li>fix leaks</li>
+  <li>custom domains (see <code>ownmx</code> branch for crude solution)</li>
+  <li>reply-to munging for full anonymization</li>
+</ul>
+<p>and now hurry and follow <a href="http://twitter.com/pilif">@pilif</a></p>
+</div>
+
+
+
+</div>
+
+</body>
+</html>

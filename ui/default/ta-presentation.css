@@ -1,0 +1,21 @@
+.sidenote{
+    font-size: 0.5em !important;
+}
+
+#anim img{
+    visibility: hidden;
+}
+
+#anim img.current{
+    visibility: visible;
+}
+
+#anim {
+    position: relative;
+    height: 370px
+}
+#anim img {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
